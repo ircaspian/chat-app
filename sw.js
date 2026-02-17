@@ -1,16 +1,26 @@
-// Service Worker for Push Notifications
-const CACHE_NAME = 'chat-app-v1';
+// Service Worker for Push Notifications - Optimized for Android
+const CACHE_NAME = 'chat-app-v2';
 
-// Install event
+// Install event - فوری فعال شود
 self.addEventListener('install', (event) => {
-  console.log('Service Worker installing...');
-  self.skipWaiting();
+  console.log('🔧 Service Worker installing...');
+  event.waitUntil(self.skipWaiting());
 });
 
-// Activate event
+// Activate event - کنترل تمام کلاینت‌ها
 self.addEventListener('activate', (event) => {
-  console.log('Service Worker activated');
-  event.waitUntil(clients.claim());
+  console.log('✅ Service Worker activated');
+  event.waitUntil(
+    Promise.all([
+      self.clients.claim(),
+      // پاک کردن کش قدیمی
+      caches.keys().then(keys => {
+        return Promise.all(
+          keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+        );
+      })
+    ])
+  );
 });
 
 // Fetch event - برای PWA
@@ -31,23 +41,39 @@ self.addEventListener('fetch', (event) => {
 
 // Handle messages from the main app
 self.addEventListener('message', (event) => {
+  console.log('📨 SW received message:', event.data?.type);
+  
   if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
     const { title, body, icon, tag, data } = event.data;
     
-    self.registration.showNotification(title, {
-      body: body || '',
-      icon: icon || '/icon-192.png',
-      badge: '/icon-192.png',
-      tag: tag || 'chat-message',
-      data: data || {},
-      vibrate: [200, 100, 200],
-      requireInteraction: false,
-      silent: false,
-      actions: [
-        { action: 'open', title: 'باز کردن' },
-        { action: 'close', title: 'بستن' }
-      ]
-    });
+    // نمایش نوتیفیکیشن با تنظیمات بهینه برای اندروید
+    event.waitUntil(
+      self.registration.showNotification(title, {
+        body: body || '',
+        icon: icon || '/icon-192.png',
+        badge: '/icon-192.png',
+        tag: tag || 'chat-message-' + Date.now(),
+        data: data || {},
+        vibrate: [100, 50, 100, 50, 100],
+        requireInteraction: true, // در اندروید باقی بماند
+        renotify: true, // حتی با همان تگ، دوباره نوتیف بده
+        silent: false,
+        timestamp: Date.now(),
+        actions: [
+          { action: 'reply', title: '↩️ پاسخ' },
+          { action: 'open', title: '📖 باز کردن' }
+        ]
+      }).then(() => {
+        console.log('✅ Notification shown:', title);
+      }).catch(err => {
+        console.error('❌ Notification error:', err);
+      })
+    );
+  }
+  
+  // پیام برای چک کردن وضعیت
+  if (event.data && event.data.type === 'CHECK_SW') {
+    event.ports[0]?.postMessage({ status: 'active', timestamp: Date.now() });
   }
 });
 
@@ -89,20 +115,51 @@ self.addEventListener('notificationclick', (event) => {
 
 // Handle push event (for future server-side push)
 self.addEventListener('push', (event) => {
-  console.log('Push received:', event);
+  console.log('📬 Push received:', event);
+  
+  let notificationData = {
+    title: 'پیام جدید',
+    body: '',
+    icon: '/icon-192.png',
+    tag: 'chat-push-' + Date.now(),
+    data: {}
+  };
   
   if (event.data) {
-    const data = event.data.json();
-    
-    event.waitUntil(
-      self.registration.showNotification(data.title || 'پیام جدید', {
-        body: data.body || '',
-        icon: data.icon || '/icon-192.png',
-        badge: '/icon-192.png',
-        tag: data.tag || 'chat-message',
-        data: data.data || {},
-        vibrate: [200, 100, 200]
-      })
-    );
+    try {
+      const data = event.data.json();
+      notificationData = { ...notificationData, ...data };
+    } catch (e) {
+      notificationData.body = event.data.text();
+    }
+  }
+  
+  event.waitUntil(
+    self.registration.showNotification(notificationData.title, {
+      body: notificationData.body,
+      icon: notificationData.icon,
+      badge: '/icon-192.png',
+      tag: notificationData.tag,
+      data: notificationData.data,
+      vibrate: [100, 50, 100, 50, 100],
+      requireInteraction: true,
+      renotify: true
+    })
+  );
+});
+
+// Background Sync - برای ارسال پیام‌های آفلاین
+self.addEventListener('sync', (event) => {
+  console.log('🔄 Background sync:', event.tag);
+  if (event.tag === 'send-messages') {
+    // در آینده می‌توان پیام‌های صف شده را ارسال کرد
+  }
+});
+
+// Periodic Background Sync - برای چک کردن پیام‌های جدید
+self.addEventListener('periodicsync', (event) => {
+  console.log('⏰ Periodic sync:', event.tag);
+  if (event.tag === 'check-messages') {
+    // در آینده می‌توان پیام‌های جدید را چک کرد
   }
 });
