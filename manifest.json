@@ -2,7 +2,8 @@
   "name": "پیام‌رسان",
   "short_name": "چت",
   "description": "برنامه چت آنلاین",
-  "start_url": "/",
+  "start_url": "/chat-app/",
+  "scope": "/chat-app/",
   "display": "standalone",
   "background_color": "#0e1621",
   "theme_color": "#17212b",
@@ -11,13 +12,13 @@
   "lang": "fa",
   "icons": [
     {
-      "src": "/icon-192.png",
+      "src": "/chat-app/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icon-512.png",
+      "src": "/chat-app/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
